@@ -1,4 +1,7 @@
 CSV_FOLDER_PATH = "./csv"
+DOCS_FOLDER_PATH = "./docs"
+COMPLETED_FOLDER_PATH = "./completed"
+DEFAULT_PDF_PASS = "DEE0702"
 
 
 # Temporary unlocked PDF file name
