@@ -22,3 +22,6 @@ csv/*
 
 completed/*
 !completed/        # Exclude the directory itself but not its contents
+
+# Ignore root level unlocked.pdf file
+unlocked.pdf
