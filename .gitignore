@@ -12,3 +12,13 @@ __pycache__/
 
 # Ignore macOS system files
 .DS_Store
+
+# Ignore specific directories and their contents
+docs/*
+!docs/             # Exclude the directory itself but not its contents
+
+csv/*
+!csv/              # Exclude the directory itself but not its contents
+
+completed/*
+!completed/        # Exclude the directory itself but not its contents
