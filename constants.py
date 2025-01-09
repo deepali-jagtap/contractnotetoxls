@@ -1,14 +1,20 @@
+# file paths
 CSV_FOLDER_PATH = "./csv"
 DOCS_FOLDER_PATH = "./docs"
 COMPLETED_FOLDER_PATH = "./completed"
+LEDGER_FOLDER_PATH = "./ledger_files"
+BOUGHT_STOCKS_CSV = f"{CSV_FOLDER_PATH}/bought_stocks.csv"
+SOLD_STOCKS_CSV = f"{CSV_FOLDER_PATH}/sold_stocks.csv"
+PROFIT_LOSS_CSV = f"{CSV_FOLDER_PATH}/profit_loss.csv"
+BUY_LEDGER_CSV = f"{CSV_FOLDER_PATH}/buy_ledger.csv"
+SELL_LEDGER_CSV = f"{CSV_FOLDER_PATH}/sell_ledger.csv"
+CREATE_LEDGER_XML = f"{LEDGER_FOLDER_PATH}/create_ledger.xml"
 DEFAULT_PDF_PASS = "DEE0702"
-
 
 # Temporary unlocked PDF file name
 TEMP_UNLOCKED_PDF = "unlocked.pdf"
 PDF_EXT = ".pdf"
 CSV_EXT = '.csv'
-
 
 # Column names
 SEGMENT_COLUMN = "Segment"
@@ -24,3 +30,65 @@ CSV_MODE_APPEND = "a"
 # Custom strings
 SUB_TOTAL_STRING = "Sub Total"
 SECURITY_DESCRIPTION = 'Security description'
+EMPTY_STRING = ""
+
+# Ledger column keys
+LEDGER_DATE = "Date"
+LEDGER_VOUCHER_TYPE = "Voucher Type"
+LEDGER_DAY = "Day"
+LEDGER_MONTH = "Month"
+LEDGER_REF_NO = "Ref. No."
+LEDGER_DR_LEDGER = "Dr. Ledger"
+LEDGER_CR_LEDGER = "Cr. Ledger Name"
+LEDGER_AMOUNT = "Amount"
+LEDGER_NARRATION = "Narration"
+NARRATION_QUANTITY = "Quantity"
+NARRATION_RATE = "Rate"
+
+LEDGER_COLUMNS = [LEDGER_DATE, LEDGER_VOUCHER_TYPE, LEDGER_DAY, LEDGER_MONTH, LEDGER_REF_NO, LEDGER_DR_LEDGER,
+                  LEDGER_CR_LEDGER, LEDGER_AMOUNT, LEDGER_NARRATION]
+
+# Column Names (used in the DataFrame)
+COLUMN_QUANTITY_BOUGHT = "Quantity Bought for you"
+COLUMN_QUANTITY_SOLD = "Quantity Sold for you"
+COLUMN_TOTAL_GROSS = "Total gross (Rs.)"
+COLUMN_AVERAGE_RATE = "Average rate (Rs.)"
+COLUMN_SECURITY_DESC = "Security description"
+
+# Ledger Defaults
+VOUCHER_TYPE = "Journal"
+SHARES_LABEL = "SHARES"
+BROKER_NAME = "HDFC Securities Limited"
+
+# XML Element Constants
+XML_ENVELOPE = "ENVELOPE"
+XML_HEADER = "HEADER"
+XML_TALLYREQUEST = "TALLYREQUEST"
+XML_IMPORT_DATA = "IMPORTDATA"
+XML_BODY = "BODY"
+XML_REQUESTDESC = "REQUESTDESC"
+XML_REQUESTNAME = "REPORTNAME"
+XML_REQUESTDATA = "REQUESTDATA"
+XML_TALLYMESSAGE = "TALLYMESSAGE"
+XML_LEDGER = "LEDGER"
+XML_GROUP = "GROUP"
+XML_NAME = "NAME"
+XML_ACTION_CREATE = "Create"
+XML_ACTION = "ACTION"
+XML_PARENT = "PARENT"
+XML_OPENINGBALANCE = "OPENINGBALANCE"
+XML_NARRATION = "NARRATION"
+
+# Custom Group and Report Name
+TALLY_GROUP_NAME = "KumoTechAutomation"
+TALLY_GROUP_PARENT = "Current Assets"
+REPORT_NAME_ALL_MASTERS = "All Masters"
+TALLY_UDF_NAMESPACE = "TallyUDF"
+
+# CSV Column Headers
+CSV_COLUMN_DR_LEDGER = "Dr. Ledger"
+CSV_COLUMN_AMOUNT = "Amount"
+CSV_COLUMN_NARRATION = "Narration"
+
+# File Path for Generated XML
+CREATE_LEDGER_XML = "ledger_output.xml"
