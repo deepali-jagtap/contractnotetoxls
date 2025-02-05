@@ -9,6 +9,7 @@ import pikepdf
 import shutil
 from datetime import datetime
 import xml.etree.ElementTree as ET
+from xml.dom.minidom import parseString
 
 from constants import (
     # File and folder paths
@@ -29,11 +30,13 @@ from constants import (
     VOUCHER_TYPE, SHARES_LABEL,
 
     # Narration-related
-    NARRATION_QUANTITY, NARRATION_RATE, EMPTY_STRING, CREATE_LEDGER_XML, BROKER_NAME, XML_ENVELOPE, XML_HEADER,
-    XML_TALLYREQUEST, XML_BODY, XML_IMPORT_DATA, XML_REQUESTDESC, XML_REQUESTNAME, REPORT_NAME_ALL_MASTERS,
-    XML_REQUESTDATA, XML_TALLYMESSAGE, TALLY_UDF_NAMESPACE, TALLY_GROUP_NAME, XML_ACTION, XML_ACTION_CREATE, XML_GROUP,
-    XML_NAME, XML_PARENT, TALLY_GROUP_PARENT, CSV_COLUMN_DR_LEDGER, XML_LEDGER, XML_OPENINGBALANCE, CSV_COLUMN_AMOUNT,
-    CSV_COLUMN_NARRATION, XML_NARRATION,
+    NARRATION_QUANTITY, NARRATION_RATE, EMPTY_STRING, CREATE_LEDGER_XML, BROKER_NAME,
+
+    # Ledger creation related
+    XML_ENVELOPE, XML_HEADER, XML_TALLYREQUEST, XML_BODY, XML_IMPORT_DATA, XML_REQUESTDESC,
+    XML_REQUESTNAME, REPORT_NAME_ALL_MASTERS, XML_REQUESTDATA, XML_TALLYMESSAGE, TALLY_UDF_NAMESPACE,
+    TALLY_GROUP_NAME, XML_ACTION, XML_ACTION_CREATE, XML_GROUP, XML_NAME, XML_PARENT, TALLY_GROUP_PARENT,
+    CSV_COLUMN_DR_LEDGER, XML_LEDGER, XML_OPENINGBALANCE, CSV_COLUMN_AMOUNT, CSV_COLUMN_NARRATION, XML_NARRATION,
 )
 
 
@@ -98,7 +101,6 @@ def extract_date_components(trade_date):
 
 def process_folder(folder_path, completed_folder, passwd):
     """Function to process all files in a folder and move them to the completed folder."""
-    # Ensure the completed folder exists
     if not os.path.exists(completed_folder):
         os.makedirs(completed_folder)
 
@@ -112,8 +114,6 @@ def process_folder(folder_path, completed_folder, passwd):
                 filtered_tables, trade_date = extract_tables_from_pdf(TEMP_UNLOCKED_PDF)
                 date_components = extract_date_components(trade_date)
                 if filtered_tables:
-                    # save_bought_and_sold_to_csv(filtered_tables, filename)
-                    # identify_speculation(csv_file)
                     process_pdfs_to_ledger_with_new_format(filtered_tables, BUY_LEDGER_CSV, SELL_LEDGER_CSV,
                                                            date_components)
                     generate_ledger_xml(BUY_LEDGER_CSV)
@@ -124,34 +124,17 @@ def process_folder(folder_path, completed_folder, passwd):
             else:
                 print(f"Failed to unlock PDF: {filename}")
 
-            # Process the file
-            # text = process_file(file_path, passwd)
-            # if text:
-            #     print(f"SUCCESS: Successfully processed {filename}\n")
-            #     # Optionally, save the text content or handle it here
-            #
-            #     # Move the processed file to the completed folder
-            #     completed_file_path = os.path.join(completed_folder, filename)
-            #     move_file(file_path, completed_file_path)
-            # else:
-            #     print(f"Failed to process {filename}\n")
-
 
 # Open the PDF file
 def process_file(lockedpdf, passwd):
     try:
         filtered_tables = []
-        #print("Processing file ", lockedpdf)
-        # pdffile = TEMP_UNLOCKED_PDF
         with pikepdf.open(lockedpdf, password=passwd) as pdf:
             pdf.save(TEMP_UNLOCKED_PDF)
         with pdfplumber.open(TEMP_UNLOCKED_PDF) as pdf:
 
-            # Loop through each page
-            #print("Pages: ", len(pdf.pages))
             for page_number, page in enumerate(pdf.pages, start=1):
                 tables = page.extract_tables()
-                #print("Tables found on page ", page_number,  len(tables))
 
                 # Loop through each table in the page
                 for table_idx, table in enumerate(tables):
@@ -159,7 +142,6 @@ def process_file(lockedpdf, passwd):
                         header = table[0]  # Assuming first row is the header
 
                     # Check if the header contains a column named 'Segment' and has 11 columns
-                    #print("Header: ", header)
                     if SEGMENT_COLUMN in header and len(header) == NUM_COLUMNS:
                         # Filter rows with exactly 11 columns
                         filtered_table = [row for row in table if len(row) == NUM_COLUMNS]
@@ -173,9 +155,6 @@ def process_file(lockedpdf, passwd):
                         # Only append the table if rows still remain after filtering
                         if filtered_table:
                             filtered_tables.append(filtered_table)
-                        print(f"Table {table_idx + 1} on page {page_number} meets the criteria.")
-                        print("=================================")
-                        print(filtered_table)
 
             if not filtered_tables:
                 print("No tables with the specified criteria found in the document.")
@@ -186,7 +165,6 @@ def process_file(lockedpdf, passwd):
 
         for idx, table in enumerate(filtered_tables):
             df = pd.DataFrame(table[1:], columns=table[0])  # Convert to DataFrame with header
-            #csv_filename = f"table_{idx+1}.csv"  # Unique filename for each table
 
             # Strip leading and trailing spaces from all string columns
             string_columns = df.select_dtypes(include=['object']).columns  # Get all string columns
@@ -200,13 +178,6 @@ def process_file(lockedpdf, passwd):
                 # For subsequent tables, append without header:
                 df.to_csv(csv_filename, index=False, mode=CSV_MODE_APPEND, header=False)
 
-            # if (idx > 1):
-            #     df.to_csv(csv_filename, index=False, mode='a', header=False)
-            # else:
-            #     df.to_csv(csv_filename, index=False, encoding='utf-8')  # Export DataFrame to CSV
-            # print(f"Exported table {idx+1} to {csv_filename}")
-
-        # identify_speculation('./docs\\unlockedModified.csv')
         identify_speculation(csv_filename)
         return True
     except Exception as e:
@@ -243,64 +214,6 @@ def extract_tables_from_pdf(pdf_path):
     return filtered_tables, trade_date
 
 
-# Function to save bought and sold stocks into separate CSV files
-def save_bought_and_sold_to_csv(filtered_tables, pdf_filename):
-    """
-    Save bought and sold stock details into two separate CSV files.
-    Remove unnecessary columns from each CSV.
-    """
-
-    bought_list = []
-    sold_list = []
-
-    for table in filtered_tables:
-        df = pd.DataFrame(table[1:], columns=table[0])
-
-        # Clean up and standardize column names
-        df.columns = (
-            df.columns.str.strip()  # Remove leading/trailing spaces
-            .str.replace(r'\s+', ' ', regex=True)  # Replace multiple spaces with single space
-        )
-
-        # Strip spaces from all string columns
-        string_columns = df.select_dtypes(include=["object"]).columns
-        df[string_columns] = df[string_columns].apply(lambda x: x.str.strip())
-
-        # Replace empty strings or invalid numeric data with 0 in bought and sold columns
-        for col_idx in [2, 3]:  # Assuming column 2 = Bought, column 3 = Sold
-            df.iloc[:, col_idx] = pd.to_numeric(df.iloc[:, col_idx], errors='coerce').fillna(0).astype(int)
-
-        # Filter bought and sold stocks
-        bought_df = df[df.iloc[:, 2] > 0]  # 'Quantity Bought' column
-        sold_df = df[df.iloc[:, 3] > 0]  # 'Quantity Sold' column
-
-        # Remove 'Quantity Sold for you' column from bought_df
-        if not bought_df.empty:
-            if 'Quantity Sold for you' in bought_df.columns:
-                bought_df = bought_df.drop(columns=['Quantity Sold for you'])
-            bought_list.append(bought_df)
-
-        # Remove 'Quantity Bought for you' column from sold_df
-        if not sold_df.empty:
-            if 'Quantity Bought for you' in sold_df.columns:
-                sold_df = sold_df.drop(columns=['Quantity Bought for you'])
-            sold_list.append(sold_df)
-
-    # Concatenate and save bought stocks
-    if bought_list:
-        bought_stocks = pd.concat(bought_list, ignore_index=True)
-        bought_stocks.to_csv(BOUGHT_STOCKS_CSV, index=False, encoding=CSV_ENCODING, mode='a',
-                             header=not os.path.exists(BOUGHT_STOCKS_CSV))
-        print(f"Bought stocks saved to {BOUGHT_STOCKS_CSV}")
-
-    # Concatenate and save sold stocks
-    if sold_list:
-        sold_stocks = pd.concat(sold_list, ignore_index=True)
-        sold_stocks.to_csv(SOLD_STOCKS_CSV, index=False, encoding=CSV_ENCODING, mode='a',
-                           header=not os.path.exists(SOLD_STOCKS_CSV))
-        print(f"Sold stocks saved to {SOLD_STOCKS_CSV}")
-
-
 def identify_speculation(file_path):
     print(f"Identifying speculative trades in a CSV file: ", file_path)
 
@@ -334,70 +247,6 @@ def identify_speculation(file_path):
             print(f"Speculation detected for stock:\n {stock} | Bought: {bought_qty} | Sold: {sold_qty}")
     else:
         print("No speculative trades found.")
-
-
-def calculate_profit_loss(bought_csv, sold_csv, output_csv):
-    """
-    Reads bought and sold stocks CSV files, calculates profit/loss for each stock,
-    and writes the results to a new CSV file.
-
-    Parameters:
-        bought_csv (str): Path to the bought stocks CSV file.
-        sold_csv (str): Path to the sold stocks CSV file.
-        output_csv (str): Path for the output CSV file with profit/loss details.
-    """
-    try:
-        # Read bought and sold stocks CSV
-        bought_df = pd.read_csv(bought_csv)
-        sold_df = pd.read_csv(sold_csv)
-
-        # Clean column names (strip spaces)
-        bought_df.columns = bought_df.columns.str.strip()
-        sold_df.columns = sold_df.columns.str.strip()
-
-        # Ensure proper numeric types for calculations
-        bought_df['Quantity Bought for you'] = bought_df['Quantity Bought for you'].astype(int)
-        bought_df['Average rate (Rs.)'] = bought_df['Average rate (Rs.)'].astype(float)
-
-        sold_df['Quantity Sold for you'] = sold_df['Quantity Sold for you'].astype(int)
-        sold_df['Average rate (Rs.)'] = sold_df['Average rate (Rs.)'].astype(float)
-
-        # Group bought and sold stocks by 'Security description' to calculate total quantities and values
-        bought_grouped = bought_df.groupby('Security description').agg({
-            'Quantity Bought for you': 'sum',
-            'Average rate (Rs.)': 'mean'
-        }).rename(columns={
-            'Quantity Bought for you': 'TotalBoughtQuantity',
-            'Average rate (Rs.)': 'AvgBoughtRate'
-        }).reset_index()
-
-        sold_grouped = sold_df.groupby('Security description').agg({
-            'Quantity Sold for you': 'sum',
-            'Average rate (Rs.)': 'mean'
-        }).rename(columns={
-            'Quantity Sold for you': 'TotalSoldQuantity',
-            'Average rate (Rs.)': 'AvgSoldRate'
-        }).reset_index()
-
-        # Merge the bought and sold dataframes on 'Security description'
-        merged_df = pd.merge(sold_grouped, bought_grouped, on='Security description', how='left')
-
-        # Calculate Profit/Loss for each stock
-        merged_df['Profit/Loss (Rs.)'] = (
-                (merged_df['AvgSoldRate'] - merged_df['AvgBoughtRate']) * merged_df['TotalSoldQuantity']
-        )
-
-        # Filter out rows with no sold quantity
-        merged_df = merged_df[merged_df['TotalSoldQuantity'] > 0]
-
-        # Save the profit/loss results to a new CSV
-        merged_df.to_csv(output_csv, index=False)
-
-        print(f"Profit/Loss details saved to: {output_csv}")
-        print(merged_df)
-
-    except Exception as e:
-        print(f"Error occurred while calculating profit/loss: {e}")
 
 
 def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell_ledger_csv, date_components):
@@ -450,7 +299,6 @@ def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell
                         LEDGER_MONTH: date_components[LEDGER_MONTH],
                         LEDGER_REF_NO: EMPTY_STRING,
                         LEDGER_DR_LEDGER: security_desc,
-                        # LEDGER_CR_LEDGER: row[COLUMN_SECURITY_DESC],
                         LEDGER_CR_LEDGER: BROKER_NAME,
                         LEDGER_AMOUNT: row[COLUMN_TOTAL_GROSS],
                         LEDGER_NARRATION: f"{NARRATION_QUANTITY}: {row[COLUMN_QUANTITY_BOUGHT]}, "
@@ -467,7 +315,6 @@ def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell
                         LEDGER_DAY: date_components[LEDGER_DAY],
                         LEDGER_MONTH: date_components[LEDGER_MONTH],
                         LEDGER_REF_NO: EMPTY_STRING,
-                        # LEDGER_DR_LEDGER: row[COLUMN_SECURITY_DESC],
                         LEDGER_DR_LEDGER: BROKER_NAME,
                         LEDGER_CR_LEDGER: security_desc,
                         LEDGER_AMOUNT: row[COLUMN_TOTAL_GROSS],
@@ -526,5 +373,8 @@ def generate_ledger_xml(csv_path):
         ET.SubElement(ledger, XML_NARRATION).text = row[CSV_COLUMN_NARRATION]
 
     xml_str = ET.tostring(envelope, encoding='unicode')
+    parsed_xml = parseString(xml_str)
+    pretty_xml = parsed_xml.toprettyxml(indent="  ")
+
     with open(CREATE_LEDGER_XML, "w") as xml_file:
-        xml_file.write(xml_str)
+        xml_file.write(pretty_xml)

@@ -10,7 +10,7 @@ from constants import (
     SELL_LEDGER_CSV
 )
 
-from process.process_pdf import calculate_profit_loss, process_folder
+from process.process_pdf import process_folder
 import os
 
 
@@ -29,8 +29,6 @@ def main():
 
     # Process each file in the folder
     process_folder(DOCS_FOLDER_PATH, COMPLETED_FOLDER_PATH, DEFAULT_PDF_PASS)
-
-    # calculate_profit_loss(BOUGHT_STOCKS_CSV, SOLD_STOCKS_CSV, PROFIT_LOSS_CSV)
 
 
 if __name__ == "__main__":

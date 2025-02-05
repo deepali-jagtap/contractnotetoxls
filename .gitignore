@@ -28,3 +28,5 @@ completed/*
 
 # Ignore root level unlocked.pdf file
 unlocked.pdf
+
+ledger_files/*

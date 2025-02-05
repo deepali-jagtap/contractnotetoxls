@@ -89,6 +89,3 @@ TALLY_UDF_NAMESPACE = "TallyUDF"
 CSV_COLUMN_DR_LEDGER = "Dr. Ledger"
 CSV_COLUMN_AMOUNT = "Amount"
 CSV_COLUMN_NARRATION = "Narration"
-
-# File Path for Generated XML
-CREATE_LEDGER_XML = "ledger_output.xml"
