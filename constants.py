@@ -1,15 +1,33 @@
-# file paths
-CSV_FOLDER_PATH = "./csv"
-DOCS_FOLDER_PATH = "./docs"
-COMPLETED_FOLDER_PATH = "./completed"
-LEDGER_FOLDER_PATH = "./ledger_files"
-BOUGHT_STOCKS_CSV = f"{CSV_FOLDER_PATH}/bought_stocks.csv"
-SOLD_STOCKS_CSV = f"{CSV_FOLDER_PATH}/sold_stocks.csv"
-PROFIT_LOSS_CSV = f"{CSV_FOLDER_PATH}/profit_loss.csv"
-BUY_LEDGER_CSV = f"{CSV_FOLDER_PATH}/buy_ledger.csv"
-SELL_LEDGER_CSV = f"{CSV_FOLDER_PATH}/sell_ledger.csv"
-CREATE_LEDGER_XML = f"{LEDGER_FOLDER_PATH}/create_ledger.xml"
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+
+CSV_FOLDER_PATH = BASE_DIR / "csv"
+DOCS_FOLDER_PATH = BASE_DIR / "docs"
+COMPLETED_FOLDER_PATH = BASE_DIR / "completed"
+LEDGER_FOLDER_PATH = BASE_DIR / "ledger_files"
+
+
+# Define file paths
+BOUGHT_STOCKS_CSV = CSV_FOLDER_PATH / "bought_stocks.csv"
+SOLD_STOCKS_CSV = CSV_FOLDER_PATH / "sold_stocks.csv"
+PROFIT_LOSS_CSV = CSV_FOLDER_PATH / "profit_loss.csv"
+BUY_LEDGER_CSV = CSV_FOLDER_PATH / "buy_ledger.csv"
+SELL_LEDGER_CSV = CSV_FOLDER_PATH / "sell_ledger.csv"
+CREATE_LEDGER_XML = LEDGER_FOLDER_PATH / "create_ledger.xml"
 DEFAULT_PDF_PASS = "DEE0702"
+
+# Ensure directories exist
+for folder in [CSV_FOLDER_PATH, DOCS_FOLDER_PATH, COMPLETED_FOLDER_PATH, LEDGER_FOLDER_PATH]:
+    folder.mkdir(parents=True, exist_ok=True)  # Creates directories if they don't exist
+
+print("buy ledger is ===>",BUY_LEDGER_CSV)
+
+# Ensure directories exist
+CSV_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
+DOCS_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
+COMPLETED_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
+LEDGER_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
 
 # Temporary unlocked PDF file name
 TEMP_UNLOCKED_PDF = "unlocked.pdf"
