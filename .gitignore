@@ -30,3 +30,7 @@ completed/*
 unlocked.pdf
 
 ledger_files/*
+
+# Ignore failed_contract_note files and output files.
+errors/*
+logs/*

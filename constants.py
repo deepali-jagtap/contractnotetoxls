@@ -1,4 +1,7 @@
 from pathlib import Path
+import sys
+
+
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -6,6 +9,7 @@ CSV_FOLDER_PATH = BASE_DIR / "csv"
 DOCS_FOLDER_PATH = BASE_DIR / "docs"
 COMPLETED_FOLDER_PATH = BASE_DIR / "completed"
 LEDGER_FOLDER_PATH = BASE_DIR / "ledger_files"
+FAILED_CONTRACT_NOTE_FOLDER_PATH = BASE_DIR / "errors"
 
 
 # Define file paths
@@ -15,7 +19,9 @@ PROFIT_LOSS_CSV = CSV_FOLDER_PATH / "profit_loss.csv"
 BUY_LEDGER_CSV = CSV_FOLDER_PATH / "buy_ledger.csv"
 SELL_LEDGER_CSV = CSV_FOLDER_PATH / "sell_ledger.csv"
 CREATE_LEDGER_XML = LEDGER_FOLDER_PATH / "create_ledger.xml"
+FAILED_CSV = FAILED_CONTRACT_NOTE_FOLDER_PATH / "failed_contract_note.csv"  # CSV file to log failed files
 DEFAULT_PDF_PASS = "DEE0702"
+
 
 # Ensure directories exist
 for folder in [CSV_FOLDER_PATH, DOCS_FOLDER_PATH, COMPLETED_FOLDER_PATH, LEDGER_FOLDER_PATH]:
@@ -107,3 +113,28 @@ TALLY_UDF_NAMESPACE = "TallyUDF"
 CSV_COLUMN_DR_LEDGER = "Dr. Ledger"
 CSV_COLUMN_AMOUNT = "Amount"
 CSV_COLUMN_NARRATION = "Narration"
+
+class LogLevels:
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    SUCCESS = "SUCCESS"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+class SinkLogs:
+    DEFAULT_SINK = sys.stdout
+    LOG_FILE = "logs/output_{time:YYYY-MM-DD}.log"  # Include date in the file name
+
+
+class FileLogsConfig:
+    FILE_ARGS = {
+        "sink": SinkLogs.LOG_FILE,
+        "format": (
+            "{time:YYYY-MM-DD HH:mm:ss.SSS}| {level: <8} | {message} | "
+            "File: {file} | Line: {line} | Function: {function}"
+        ),
+        "level": LogLevels.INFO,  # default value
+        "colorize": False,
+        "rotation": "1 week",
+    }

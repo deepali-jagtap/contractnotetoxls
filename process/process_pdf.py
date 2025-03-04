@@ -38,6 +38,9 @@ from constants import (
     TALLY_GROUP_NAME, XML_ACTION, XML_ACTION_CREATE, XML_GROUP, XML_NAME, XML_PARENT, TALLY_GROUP_PARENT,
     CSV_COLUMN_DR_LEDGER, XML_LEDGER, XML_OPENINGBALANCE, CSV_COLUMN_AMOUNT, CSV_COLUMN_NARRATION, XML_NARRATION,
 )
+from logger import  log_failed_file
+from loguru import logger
+
 
 
 def move_file(src, dest):
@@ -48,8 +51,10 @@ def move_file(src, dest):
         if not os.path.exists(src) and os.path.exists(dest):
             print("")
         else:
+            logger.error(" Source still exists or destination does not exist. FalseNo exist !")
             print("Move failed: Source still exists or destination does not exist. {dest}")
     except Exception as e:
+        logger.opt(exception=True).error(f"An error occurred: {e}")
         print(f"An error occurred: {e}")
 
 
@@ -70,6 +75,7 @@ def unlock_pdf(locked_pdf, passwd):
         return True
     except Exception as e:
         print(f"Error unlocking PDF: {e}")
+        logger.opt(exception=True).error(f"Error unlocking PDF: {e}")
         return False
 
 
@@ -95,6 +101,7 @@ def extract_date_components(trade_date):
         return {"Date": date, "Day": day, "Month": month}
 
     except ValueError:
+        # logger.opt(exception=True).error(f"Invalid date format: {trade_date}")
         print(f"Invalid date format: {trade_date}")
         return {"Date": "", "Day": "", "Month": ""}
 
@@ -109,7 +116,7 @@ def process_folder(folder_path, completed_folder, passwd):
         if filename.lower().endswith(PDF_EXT):  # Only process PDF files
             file_path = os.path.join(folder_path, filename)
             print(f"Processing file: {file_path}")
-
+        try:
             if unlock_pdf(file_path, passwd):
                 filtered_tables, trade_date = extract_tables_from_pdf(TEMP_UNLOCKED_PDF)
                 date_components = extract_date_components(trade_date)
@@ -118,11 +125,20 @@ def process_folder(folder_path, completed_folder, passwd):
                                                            date_components)
                     generate_ledger_xml(BUY_LEDGER_CSV,SELL_LEDGER_CSV)
                     move_file(file_path, os.path.join(completed_folder, filename))
+                    logger.success(f"SUCCESS: Processed {filename}")
                     print(f"SUCCESS: Processed {filename}")
                 else:
+                    logger.warning(f"No valid tables found in {filename}")
+                    log_failed_file(filename, f"No valid tables found in {filename}")
                     print(f"No valid tables found in {filename}")
             else:
+                logger.error(f"Failed to unlock PDF: {filename}")
                 print(f"Failed to unlock PDF: {filename}")
+        except Exception as e:
+            logger.opt(exception=True).error(f"Error processing file {filename}: {e}")
+            log_failed_file(filename, f"Error processing file {filename}: {e}")
+            print(f"Error processing file {filename}: {e}")
+            continue
 
 
 # Open the PDF file
@@ -158,6 +174,7 @@ def process_file(lockedpdf, passwd):
 
             if not filtered_tables:
                 print("No tables with the specified criteria found in the document.")
+                logger.info("No tables with the specified criteria found in the document.")
 
         # Export each filtered table to a CSV file using pandas
         file_name = os.path.splitext(os.path.basename(lockedpdf))[0]
@@ -181,6 +198,7 @@ def process_file(lockedpdf, passwd):
         identify_speculation(csv_filename)
         return True
     except Exception as e:
+        logger.opt(exception=True).error(f"ERROR: {lockedpdf} An unexpected error occurred: {e}")
         print(f"ERROR: {lockedpdf} An unexpected error occurred: {e}")
 
 
@@ -210,6 +228,7 @@ def extract_tables_from_pdf(pdf_path):
 
                         if filtered_table:
                             filtered_tables.append(filtered_table)
+                            logger.info(f"Table {table_idx + 1} on page {page_number} meets the criteria.")
                             print(f"Table {table_idx + 1} on page {page_number} meets the criteria.")
     return filtered_tables, trade_date
 
@@ -228,6 +247,7 @@ def identify_speculation(file_path):
     sold_col = [col for col in data.columns if "Sold" in col]
 
     if not bought_col or not sold_col:
+        logger.opt(exception=True).error("Columns for 'bought' or 'sold' quantities not found in the dataset.")
         raise ValueError("Columns for 'bought' or 'sold' quantities not found in the dataset.")
 
     bought_col = bought_col[0]
@@ -245,8 +265,10 @@ def identify_speculation(file_path):
             bought_qty = speculation.loc[stock, bought_col]
             sold_qty = speculation.loc[stock, sold_col]
             print(f"Speculation detected for stock:\n {stock} | Bought: {bought_qty} | Sold: {sold_qty}")
+            logger.info(f"Speculation detected for stock:\n {stock} | Bought: {bought_qty} | Sold: {sold_qty}")
     else:
         print("No speculative trades found.")
+        logger.warning("No speculative trades found.")
 
 
 def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell_ledger_csv, date_components):
@@ -332,8 +354,10 @@ def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell
             buy_ledger_df = pd.DataFrame(buy_ledger_entries, columns=LEDGER_COLUMNS)
             buy_ledger_df.to_csv(buy_ledger_csv, index=False, encoding=CSV_ENCODING, mode='a',
                                  header=not os.path.exists(buy_ledger_csv))
+            logger.success("Data processing succeeded!")
             print(f"Buy ledger saved to: {buy_ledger_csv}")
         else:
+            logger.error("No buy data found. Buy ledger CSV not created.")
             print("No buy data found. Buy ledger CSV not created.")
 
         # Save the sell ledger entries to the specified CSV file
@@ -341,12 +365,14 @@ def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell
             sell_ledger_df = pd.DataFrame(sell_ledger_entries, columns=LEDGER_COLUMNS)
             sell_ledger_df.to_csv(sell_ledger_csv, index=False, encoding=CSV_ENCODING, mode='a',
                                   header=not os.path.exists(sell_ledger_csv))
+            logger.success(f"Sell ledger saved to: {sell_ledger_csv}")
             print(f"Sell ledger saved to: {sell_ledger_csv}")
         else:
+            logger.warning("No sell data found. Sell ledger CSV not created.")
             print("No sell data found. Sell ledger CSV not created.")
 
     except Exception as e:
-        print(f"Error occurred during ledger processing: {e}")
+        logger.opt(exception=True).error(f"Error occurred during ledger processing: {e}")
 
 
 def generate_ledger_xml(buy_csv_path, sell_csv_path):
@@ -359,6 +385,7 @@ def generate_ledger_xml(buy_csv_path, sell_csv_path):
 
     # Check if both dataframes are empty
     if buy_df.empty and sell_df.empty:
+        logger.warning("Both Buy and Sell ledgers are empty. Skipping XML generation.")
         print("WARNING: Both Buy and Sell ledgers are empty. Skipping XML generation.")
         return
 
@@ -411,4 +438,6 @@ def generate_ledger_xml(buy_csv_path, sell_csv_path):
         xml_file.write(pretty_xml)
 
     print("SUCCESS: Ledger XML generated from both Buy & Sell ledgers")
+    logger.success("Both Buy and Sell ledgers are empty. Skipping XML generation.")
+
 

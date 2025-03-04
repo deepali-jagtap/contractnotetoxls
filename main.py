@@ -9,10 +9,11 @@ from constants import (
     BUY_LEDGER_CSV,
     SELL_LEDGER_CSV
 )
+from logger import configure_logger
 
 from process.process_pdf import process_folder
 import os
-
+configure_logger(create_log_file=True)
 
 def main():
     # Clear existing CSV files to start fresh
