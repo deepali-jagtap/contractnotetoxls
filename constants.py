@@ -1,15 +1,39 @@
-# file paths
-CSV_FOLDER_PATH = "./csv"
-DOCS_FOLDER_PATH = "./docs"
-COMPLETED_FOLDER_PATH = "./completed"
-LEDGER_FOLDER_PATH = "./ledger_files"
-BOUGHT_STOCKS_CSV = f"{CSV_FOLDER_PATH}/bought_stocks.csv"
-SOLD_STOCKS_CSV = f"{CSV_FOLDER_PATH}/sold_stocks.csv"
-PROFIT_LOSS_CSV = f"{CSV_FOLDER_PATH}/profit_loss.csv"
-BUY_LEDGER_CSV = f"{CSV_FOLDER_PATH}/buy_ledger.csv"
-SELL_LEDGER_CSV = f"{CSV_FOLDER_PATH}/sell_ledger.csv"
-CREATE_LEDGER_XML = f"{LEDGER_FOLDER_PATH}/create_ledger.xml"
-DEFAULT_PDF_PASS = "DEE0702"
+from pathlib import Path
+import sys
+import getopt
+
+
+
+BASE_DIR = Path(__file__).resolve().parent
+
+CSV_FOLDER_PATH = BASE_DIR / "csv"
+DOCS_FOLDER_PATH = BASE_DIR / "docs"
+COMPLETED_FOLDER_PATH = BASE_DIR / "completed"
+LEDGER_FOLDER_PATH = BASE_DIR / "ledger_files"
+FAILED_CONTRACT_NOTE_FOLDER_PATH = BASE_DIR / "errors"
+
+
+# Define file paths
+BOUGHT_STOCKS_CSV = CSV_FOLDER_PATH / "bought_stocks.csv"
+SOLD_STOCKS_CSV = CSV_FOLDER_PATH / "sold_stocks.csv"
+PROFIT_LOSS_CSV = CSV_FOLDER_PATH / "profit_loss.csv"
+BUY_LEDGER_CSV = CSV_FOLDER_PATH / "buy_ledger.csv"
+SELL_LEDGER_CSV = CSV_FOLDER_PATH / "sell_ledger.csv"
+CREATE_LEDGER_XML = LEDGER_FOLDER_PATH / "create_ledger.xml"
+FAILED_CSV = FAILED_CONTRACT_NOTE_FOLDER_PATH / "failed_contract_note.csv"  # CSV file to log failed files
+
+
+# Ensure directories exist
+for folder in [CSV_FOLDER_PATH, DOCS_FOLDER_PATH, COMPLETED_FOLDER_PATH, LEDGER_FOLDER_PATH]:
+    folder.mkdir(parents=True, exist_ok=True)  # Creates directories if they don't exist
+
+print("buy ledger is ===>",BUY_LEDGER_CSV)
+
+# Ensure directories exist
+CSV_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
+DOCS_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
+COMPLETED_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
+LEDGER_FOLDER_PATH.mkdir(parents=True, exist_ok=True)
 
 # Temporary unlocked PDF file name
 TEMP_UNLOCKED_PDF = "unlocked.pdf"
@@ -58,7 +82,7 @@ COLUMN_SECURITY_DESC = "Security description"
 # Ledger Defaults
 VOUCHER_TYPE = "Journal"
 SHARES_LABEL = "SHARES"
-BROKER_NAME = "HDFC Securities Limited"
+# BROKER_NAME = "HDFC Securities Limited"
 
 # XML Element Constants
 XML_ENVELOPE = "ENVELOPE"
@@ -89,3 +113,55 @@ TALLY_UDF_NAMESPACE = "TallyUDF"
 CSV_COLUMN_DR_LEDGER = "Dr. Ledger"
 CSV_COLUMN_AMOUNT = "Amount"
 CSV_COLUMN_NARRATION = "Narration"
+
+class LogLevels:
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    SUCCESS = "SUCCESS"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+class SinkLogs:
+    DEFAULT_SINK = sys.stdout
+    LOG_FILE = "logs/output_{time:YYYY-MM-DD}.log"  # Include date in the file name
+
+
+class FileLogsConfig:
+    FILE_ARGS = {
+        "sink": SinkLogs.LOG_FILE,
+        "format": (
+            "{time:YYYY-MM-DD HH:mm:ss.SSS}| {level: <8} | {message} | "
+            "File: {file} | Line: {line} | Function: {function}"
+        ),
+        "level": LogLevels.INFO,  # default value
+        "colorize": False,
+        "rotation": "1 week",
+    }
+def get_details():
+    broker_name = None
+    pdf_pass = None
+    argv = sys.argv[1:]
+
+    try:
+        opts, args = getopt.getopt(argv, "n:p:", ["name=", "password="])
+    except:
+        print("Error in arguments")
+        sys.exit(1)
+
+    for opt, arg in opts:
+        if opt in ['-n', '--name']:
+            broker_name = arg
+        elif opt in ['-p', '--password']:
+            pdf_pass = arg
+
+    if broker_name is None:
+        print("Error: Name is required")
+        sys.exit(1)
+
+    return broker_name, pdf_pass or "DEE0702"  # Default password if none is provided
+
+BROKER_NAME, DEFAULT_PDF_PASS = get_details()
+
+print("Name:", BROKER_NAME)
+print("DEFAULT_PDF_PASS:", DEFAULT_PDF_PASS)
