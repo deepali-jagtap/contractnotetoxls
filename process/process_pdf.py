@@ -406,7 +406,7 @@ def generate_ledger_xml(buy_csv_path, sell_csv_path):
 
     # Create Tally Group
     tally_message_group = ET.SubElement(request_data, XML_TALLYMESSAGE, {"xmlns:UDF": TALLY_UDF_NAMESPACE})
-    group = ET.SubElement(tally_message_group, XML_GROUP, {"NAME": TALLY_GROUP_NAME, XML_ACTION: XML_ACTION_CREATE})
+    group = ET.SubElement(tally_message_group, XML_GROUP, {"NAME": TALLY_GROUP_NAME, XML_ACTION: XML_ACTION_CREATE })
     ET.SubElement(group, XML_NAME).text = TALLY_GROUP_NAME
     ET.SubElement(group, XML_PARENT).text = TALLY_GROUP_PARENT
 
@@ -422,8 +422,8 @@ def generate_ledger_xml(buy_csv_path, sell_csv_path):
             continue
 
         # Add the entry to XML
-        tally_message_ledger = ET.SubElement(request_data, XML_TALLYMESSAGE, {"xmlns:UDF": TALLY_UDF_NAMESPACE})
-        ledger = ET.SubElement(tally_message_ledger, XML_LEDGER, {"NAME": ledger_name, XML_ACTION: XML_ACTION_CREATE})
+        tally_message_ledger = ET.SubElement(request_data, XML_TALLYMESSAGE, {"xmlns:UDF": TALLY_UDF_NAMESPACE,})
+        ledger = ET.SubElement(tally_message_ledger, XML_LEDGER, {"NAME": ledger_name, XML_ACTION: XML_ACTION_CREATE,"IGNOREALTER":"Yes"})
         ET.SubElement(ledger, XML_NAME).text = ledger_name
         ET.SubElement(ledger, XML_PARENT).text = TALLY_GROUP_NAME
         # ET.SubElement(ledger, XML_OPENINGBALANCE).text = str(row[CSV_COLUMN_AMOUNT])

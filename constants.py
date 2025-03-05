@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import getopt
 
 
 
@@ -20,7 +21,6 @@ BUY_LEDGER_CSV = CSV_FOLDER_PATH / "buy_ledger.csv"
 SELL_LEDGER_CSV = CSV_FOLDER_PATH / "sell_ledger.csv"
 CREATE_LEDGER_XML = LEDGER_FOLDER_PATH / "create_ledger.xml"
 FAILED_CSV = FAILED_CONTRACT_NOTE_FOLDER_PATH / "failed_contract_note.csv"  # CSV file to log failed files
-DEFAULT_PDF_PASS = "DEE0702"
 
 
 # Ensure directories exist
@@ -82,7 +82,7 @@ COLUMN_SECURITY_DESC = "Security description"
 # Ledger Defaults
 VOUCHER_TYPE = "Journal"
 SHARES_LABEL = "SHARES"
-BROKER_NAME = "HDFC Securities Limited"
+# BROKER_NAME = "HDFC Securities Limited"
 
 # XML Element Constants
 XML_ENVELOPE = "ENVELOPE"
@@ -138,3 +138,30 @@ class FileLogsConfig:
         "colorize": False,
         "rotation": "1 week",
     }
+def get_details():
+    broker_name = None
+    pdf_pass = None
+    argv = sys.argv[1:]
+
+    try:
+        opts, args = getopt.getopt(argv, "n:p:", ["name=", "password="])
+    except:
+        print("Error in arguments")
+        sys.exit(1)
+
+    for opt, arg in opts:
+        if opt in ['-n', '--name']:
+            broker_name = arg
+        elif opt in ['-p', '--password']:
+            pdf_pass = arg
+
+    if broker_name is None:
+        print("Error: Name is required")
+        sys.exit(1)
+
+    return broker_name, pdf_pass or "DEE0702"  # Default password if none is provided
+
+BROKER_NAME, DEFAULT_PDF_PASS = get_details()
+
+print("Name:", BROKER_NAME)
+print("DEFAULT_PDF_PASS:", DEFAULT_PDF_PASS)
