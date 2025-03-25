@@ -159,9 +159,9 @@ def get_details():
         print("Error: Name is required")
         sys.exit(1)
 
-    return broker_name, pdf_pass or "DEE0702"  # Default password if none is provided
+    return broker_name or "HDFC Securities Limited", pdf_pass or "DEE0702"  # Default password if none is provided
 
-BROKER_NAME, DEFAULT_PDF_PASS = get_details()
+BROKER_NAME, PDF_PASS = get_details()
 
 print("Name:", BROKER_NAME)
-print("DEFAULT_PDF_PASS:", DEFAULT_PDF_PASS)
+print("DEFAULT_PDF_PASS:", PDF_PASS)

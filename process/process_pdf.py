@@ -106,7 +106,7 @@ def extract_date_components(trade_date):
         return {"Date": "", "Day": "", "Month": ""}
 
 
-def process_folder(folder_path, completed_folder, passwd):
+def process_hdfc_securities(folder_path, completed_folder, passwd):
     """Function to process all files in a folder and move them to the completed folder."""
     if not os.path.exists(completed_folder):
         os.makedirs(completed_folder)
@@ -118,9 +118,12 @@ def process_folder(folder_path, completed_folder, passwd):
             print(f"Processing file: {file_path}")
         try:
             if unlock_pdf(file_path, passwd):
-                filtered_tables, trade_date = extract_tables_from_pdf(TEMP_UNLOCKED_PDF)
+                filtered_tables, trade_date = extract_tables_from_pdf(TEMP_UNLOCKED_PDF,file_path,completed_folder,filename)
                 date_components = extract_date_components(trade_date)
+                print("mapped_data==>", filtered_tables, trade_date)
+
                 if filtered_tables:
+                    print("22==> found filtered_tables " )
                     process_pdfs_to_ledger_with_new_format(filtered_tables, BUY_LEDGER_CSV, SELL_LEDGER_CSV,
                                                            date_components)
                     generate_ledger_xml(BUY_LEDGER_CSV,SELL_LEDGER_CSV)
@@ -152,7 +155,6 @@ def process_file(lockedpdf, passwd):
             for page_number, page in enumerate(pdf.pages, start=1):
                 tables = page.extract_tables()
 
-                # Loop through each table in the page
                 for table_idx, table in enumerate(tables):
                     if table:  # Check if table is not empty
                         header = table[0]  # Assuming first row is the header
@@ -203,14 +205,13 @@ def process_file(lockedpdf, passwd):
 
 
 # Function to process a single PDF file and extract tables
-def extract_tables_from_pdf(pdf_path):
+def extract_tables_from_pdf(pdf_path,file_path,completed_folder,filename):
     filtered_tables = []
     trade_date = ''
     with pdfplumber.open(pdf_path) as pdf:
         for page_number, page in enumerate(pdf.pages, start=1):
             tables = page.extract_tables()
-            trade_date_match = re.search(r"Trade Date\s*(\d{1,2}-[a-zA-Z]{3}-\d{4})", page.extract_text())
-
+            trade_date_match = re.search(r"Trade Date\s*(\d{1,2}-[a-zA-Z]{3}-\d{4})", page.extract_text(), re.IGNORECASE)
             if trade_date_match:
                 if trade_date == '':
                     trade_date = trade_date_match.group(1)
@@ -218,6 +219,22 @@ def extract_tables_from_pdf(pdf_path):
 
             for table_idx, table in enumerate(tables):
                 if table:
+                    print("length of table i s==>",len(table[0]))
+                    if 'ISIN' in table[1] or len(table[1]) or len(table[0]) == 14:
+                        filtered_table = [row for row in table if len(row) == 14]
+                        date_components = extract_date_components(trade_date)
+                        mapped_data = transform_data(filtered_table)
+                        print("mapped data ==>", mapped_data)
+
+                        if mapped_data:
+                            df = create_dataframe(mapped_data)
+                            process_dataframe(df)
+                            save_ledger_entries(df,date_components)
+                            generate_ledger_xml(BUY_LEDGER_CSV, SELL_LEDGER_CSV)
+                            move_file(file_path, os.path.join(completed_folder, filename))
+                        else:
+                            print("mapped_data is empty")
+
                     header = table[0]
                     if SEGMENT_COLUMN in header and len(header) == NUM_COLUMNS:
                         filtered_table = [row for row in table if len(row) == NUM_COLUMNS]
@@ -285,18 +302,21 @@ def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell
         # Initialize lists to store buy and sell ledger entries
         buy_ledger_entries = []
         sell_ledger_entries = []
-
+        print("33 ===>",buy_ledger_csv,sell_ledger_csv,date_components)
         # Process each table in the filtered tables
         for table in filtered_tables:
+            print("44 ===> table", table)
+
             # Convert the table (a list of lists) into a DataFrame
             df = pd.DataFrame(table[1:], columns=table[0])  # Create DataFrame with headers
+            print(" 55 ==> dfTable==>",df)
 
             # Clean and standardize column names
             df.columns = (
                 df.columns.str.strip()
                 .str.replace(r'\s+', ' ', regex=True)  # Replace multiple spaces with single space
             )
-
+            print("66==>", df.columns )
             # Strip spaces from all string columns
             string_columns = df.select_dtypes(include=["object"]).columns
             df[string_columns] = df[string_columns].apply(lambda x: x.str.strip())
@@ -306,10 +326,12 @@ def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell
             for col in numeric_columns:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
+            print("dfRows",df.iterrows())
             # Process each row in the DataFrame
             for _, row in df.iterrows():
                 # Check for Buy Entries
+                print("array==>", row)
+
                 if row[COLUMN_QUANTITY_BOUGHT] > 0:
                     # Extract and process the security description
                     security_desc = row[COLUMN_SECURITY_DESC].split('-')[0].strip() + ' ' + SHARES_LABEL
@@ -376,6 +398,8 @@ def process_pdfs_to_ledger_with_new_format(filtered_tables, buy_ledger_csv, sell
 
 
 def generate_ledger_xml(buy_csv_path, sell_csv_path):
+    print("buy_csv_path==>",buy_csv_path)
+    print("sell_csv_path",sell_csv_path)
     buy_df = pd.read_csv(buy_csv_path)
     sell_df = pd.read_csv(sell_csv_path)
 
@@ -440,4 +464,182 @@ def generate_ledger_xml(buy_csv_path, sell_csv_path):
     print("SUCCESS: Ledger XML generated from both Buy & Sell ledgers")
     logger.success("Both Buy and Sell ledgers are empty. Skipping XML generation.")
 
+def transform_data(data):
+    """
+    Transforms the given data into the desired format.
 
+    Args:
+      data: A list of lists representing the input data.
+
+    Returns:
+      A list of lists of lists representing the transformed data.
+    """
+
+    transformed_data = []
+    for i, row in enumerate(data):
+        if i <= 1:  # Skip the first two header rows
+            continue
+
+        buy_quantity = int(row[2]) if row[2].isdigit() else 0
+        sell_quantity = int(row[7]) if row[7].isdigit() else 0
+
+        # Handle potential ValueError for Total BUY Value
+        try:
+            total_buy_value = float(row[6])
+        except ValueError:
+            total_buy_value = 0.0
+
+        # Handle potential ValueError for Total SELL Value
+        try:
+            total_sell_value = float(row[11])
+        except ValueError:
+            total_sell_value = 0.0
+
+        # Handle potential ValueError for Net Obligation
+        try:
+            net_obligation = float(row[13])
+        except ValueError:
+            net_obligation = 0.0
+
+        # Handle potential ValueError for Brokerage per share.
+        try:
+            buy_brokerage = float(row[4])
+        except ValueError:
+            buy_brokerage = 0.0
+
+        try:
+            sell_brokerage = float(row[9])
+        except ValueError:
+            sell_brokerage = 0.0
+
+        try:
+            buy_wap = float(row[3])
+        except ValueError:
+            buy_wap = 0.0
+
+        try:
+            sell_wap = float(row[8])
+        except ValueError:
+            sell_wap = 0.0
+
+        segment_data = [
+            [
+                "Segment",
+                "Security description",
+                "Quantity\nBought for you",
+                "Quantity Sold\nfor you",
+                "Total gross\n(Rs.)",
+                "Average rate\n(Rs.)",
+                "Brokerage\n(Total)",
+                "**GST on\nBrokerage (Rs.)",
+                "Total Security\nTransaction\nTax(Rs.)",
+                "Other\nStatutory\n*Levies(Rs.)",
+                "Net Amount\n(Rs.)"
+            ],
+            [
+                "Equity",  # Assuming all are Equity for simplicity. You might need logic to determine the segment.
+                row[1].replace('-\n', '-'),  # Security description
+                str(buy_quantity),
+                str(sell_quantity),
+                str(abs(total_buy_value if total_buy_value != 0 else total_sell_value)),  # Total gross (using buy or sell value)
+                str(buy_wap if buy_wap != 0 else sell_wap),  # Average rate (using buy or sell WAP)
+                str(abs(buy_brokerage if buy_brokerage != 0 else sell_brokerage)),  # Brokerage (using buy or sell value)
+                "0.00",  # GST on Brokerage (assuming 0 for simplicity)
+                "0.00",  # Total Security Transaction Tax (assuming 0 for simplicity)
+                "0.00",  # Other Statutory *Levies (assuming 0 for simplicity)
+                str(abs(net_obligation)),  # Net Amount
+            ]
+        ]
+        transformed_data.append(segment_data)
+    return transformed_data
+
+
+def create_dataframe(mapped_data):
+    """Creates a Pandas DataFrame from mapped data."""
+    data_rows = [item[1] for item in mapped_data]
+    headers = mapped_data[0][0]
+    df = pd.DataFrame(data_rows, columns=headers)
+    print("55 ==> dfTable==>", df)
+    return df
+
+def process_dataframe(df):
+    """Cleans, standardizes, and converts data in the DataFrame."""
+    df.columns = (
+        df.columns.str.strip().str.replace(r'\s+', ' ', regex=True)
+    )
+    print("66==>", df.columns)
+
+    string_columns = df.select_dtypes(include=["object"]).columns
+    df[string_columns] = df[string_columns].apply(lambda x: x.str.strip())
+
+    numeric_columns = [COLUMN_QUANTITY_BOUGHT, COLUMN_QUANTITY_SOLD, COLUMN_TOTAL_GROSS, COLUMN_AVERAGE_RATE]
+    print("77 ==>", numeric_columns)
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    print("dfRows", df.iterrows())
+
+def save_ledger_entries(df,date_components):
+    """Generates and saves buy and sell ledger entries to CSV files."""
+    sell_ledger_entries = []
+    buy_ledger_entries = []
+    for _, row in df.iterrows():
+        if row[COLUMN_QUANTITY_BOUGHT] > 0:
+            result = re.sub(r'\s+', ' ', re.sub(r'([a-zA-Z])\1+', r'\1',
+                                                row[COLUMN_SECURITY_DESC].replace('\n', ''))).strip().title()
+            security_desc = result.split('-')[0].strip() + ' ' + SHARES_LABEL
+            buy_ledger_entries.append({
+                LEDGER_DATE: date_components[LEDGER_DATE],
+                LEDGER_VOUCHER_TYPE: VOUCHER_TYPE,
+                LEDGER_DAY: date_components[LEDGER_DAY],
+                LEDGER_MONTH: date_components[LEDGER_MONTH],
+                LEDGER_REF_NO: EMPTY_STRING,
+                LEDGER_DR_LEDGER: security_desc,
+                LEDGER_CR_LEDGER: BROKER_NAME,
+                LEDGER_AMOUNT: row[COLUMN_TOTAL_GROSS],
+                LEDGER_NARRATION: f"{NARRATION_QUANTITY}: {row[COLUMN_QUANTITY_BOUGHT]}, {NARRATION_RATE}: {row[COLUMN_AVERAGE_RATE]}"
+            })
+
+        if row[COLUMN_QUANTITY_SOLD] > 0:
+
+            result = re.sub(r'\s+', ' ', re.sub(r'([a-zA-Z])\1+', r'\1', row[COLUMN_SECURITY_DESC].replace('\n', ''))).strip().title()
+            security_desc = result.split('-')[0].strip() + ' ' + SHARES_LABEL
+            sell_ledger_entries.append({
+                LEDGER_DATE: date_components[LEDGER_DATE],
+                LEDGER_VOUCHER_TYPE: VOUCHER_TYPE,
+                LEDGER_DAY: date_components[LEDGER_DAY],
+                LEDGER_MONTH: date_components[LEDGER_MONTH],
+                LEDGER_REF_NO: EMPTY_STRING,
+                LEDGER_DR_LEDGER: BROKER_NAME,
+                LEDGER_CR_LEDGER: security_desc,
+                LEDGER_AMOUNT: row[COLUMN_TOTAL_GROSS],
+                LEDGER_NARRATION: f"{NARRATION_QUANTITY}: {row[COLUMN_QUANTITY_SOLD]}, {NARRATION_RATE}: {row[COLUMN_AVERAGE_RATE]}"
+            })
+
+    # Save buy ledger
+    if not os.path.exists(BUY_LEDGER_CSV):
+        buy_ledger_df = pd.DataFrame([], columns=LEDGER_COLUMNS)
+        buy_ledger_df.to_csv(BUY_LEDGER_CSV, index=False, encoding=CSV_ENCODING, mode='a', header=True)
+
+    if buy_ledger_entries:
+        buy_ledger_df = pd.DataFrame(buy_ledger_entries, columns=LEDGER_COLUMNS)
+        buy_ledger_df.to_csv(BUY_LEDGER_CSV, index=False, encoding=CSV_ENCODING, mode='a', header=False)
+        logger.success(f"Buy ledger saved to: {BUY_LEDGER_CSV}")
+        print(f"Buy ledger saved to: {BUY_LEDGER_CSV}")
+    else:
+        logger.error("No buy data found. Buy ledger CSV not created.")
+        print("No buy data found. Buy ledger CSV not created.")
+
+    # Save sell ledger
+    if not os.path.exists(SELL_LEDGER_CSV):
+        sell_ledger_df = pd.DataFrame([], columns=LEDGER_COLUMNS)
+        sell_ledger_df.to_csv(SELL_LEDGER_CSV, index=False, encoding=CSV_ENCODING, mode='a', header=True)
+
+    if sell_ledger_entries:
+        sell_ledger_df = pd.DataFrame(sell_ledger_entries, columns=LEDGER_COLUMNS)
+        sell_ledger_df.to_csv(SELL_LEDGER_CSV, index=False, encoding=CSV_ENCODING, mode='a', header=False)
+        logger.success(f"Sell ledger saved to: {SELL_LEDGER_CSV}")
+        print(f"Sell ledger saved to: {SELL_LEDGER_CSV}")
+    else:
+        logger.warning("No sell data found. Sell ledger CSV not created.")
+        print("No sell data found. Sell ledger CSV not created.")

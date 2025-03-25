@@ -9,6 +9,8 @@ __pycache__/
 
 # Ignore all __pycache__ directories recursively
 **/__pycache__/
+process/__pycache__/
+
 
 # Ignore .idea folder (for JetBrains IDEs)
 .idea/
@@ -34,3 +36,4 @@ ledger_files/*
 # Ignore failed_contract_note files and output files.
 errors/*
 logs/*
+/__pycache__/*
