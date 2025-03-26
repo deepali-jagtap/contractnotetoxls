@@ -220,12 +220,22 @@ def extract_tables_from_pdf(pdf_path,file_path,completed_folder,filename):
             for table_idx, table in enumerate(tables):
                 if table:
                     print("length of table i s==>",len(table[0]))
-                    if 'ISIN' in table[1] or len(table[1]) or len(table[0]) == 14:
+                    date_components = extract_date_components(trade_date)
+                    if 'ISIN' in table[1] or len(table[1]) == 14 or len(table[0]) == 14:
                         filtered_table = [row for row in table if len(row) == 14]
+                        mapped_data = transform_equity_data(filtered_table)
+                        if mapped_data:
+                            df = create_dataframe(mapped_data)
+                            process_dataframe(df)
+                            save_ledger_entries(df,date_components)
+                            generate_ledger_xml(BUY_LEDGER_CSV, SELL_LEDGER_CSV)
+                            move_file(file_path, os.path.join(completed_folder, filename))
+                        else:
+                            print("mapped_data is empty")
+                    elif len(table[0]) == 10:
                         date_components = extract_date_components(trade_date)
-                        mapped_data = transform_data(filtered_table)
-                        print("mapped data ==>", mapped_data)
-
+                        filtered_table = [row for row in table if len(row) == 10]
+                        mapped_data = transform_derivative_data(filtered_table)
                         if mapped_data:
                             df = create_dataframe(mapped_data)
                             process_dataframe(df)
@@ -464,7 +474,7 @@ def generate_ledger_xml(buy_csv_path, sell_csv_path):
     print("SUCCESS: Ledger XML generated from both Buy & Sell ledgers")
     logger.success("Both Buy and Sell ledgers are empty. Skipping XML generation.")
 
-def transform_data(data):
+def transform_equity_data(data):
     """
     Transforms the given data into the desired format.
 
@@ -643,3 +653,60 @@ def save_ledger_entries(df,date_components):
     else:
         logger.warning("No sell data found. Sell ledger CSV not created.")
         print("No sell data found. Sell ledger CSV not created.")
+def transform_derivative_data(input_data):
+    """
+    Transforms derivative data into the desired format, specifically for the given input structure.
+
+    Args:
+        input_data: A list of lists representing the derivative data.
+
+    Returns:
+        A list of lists of lists representing the transformed derivative data,
+        or an empty list if there's an error.
+    """
+
+    transformed_data = []
+
+    if not input_data or len(input_data) < 2:
+        return []  # Return empty list for invalid input
+
+    row = input_data[1]  # Extract the data row
+
+    # Directly use the known indices for the data
+    security_description = row[0].replace('-\n', '-')
+    buy_quantity = int(row[2]) if isinstance(row[2], str) and row[2].isdigit() else 0
+    wap_rs = float(row[4]) if isinstance(row[4], (int, float, str)) and str(row[4]).replace('.', '', 1).isdigit() else 0.0
+    brokerage_per_unit = float(row[5]) if isinstance(row[5], (int, float, str)) and str(row[5]).replace('.', '', 1).isdigit() else 0.0
+    net_total = float(row[8]) if isinstance(row[8], (int, float, str)) and str(row[8]).replace('.', '', 1).isdigit() else 0.0
+
+    segment_data = [
+        [
+            "Segment",
+            "Security description",
+            "Quantity\nBought for you",
+            "Quantity Sold\nfor you",
+            "Total gross\n(Rs.)",
+            "Average rate\n(Rs.)",
+            "Brokerage\n(Total)",
+            "**GST on\nBrokerage (Rs.)",
+            "Total Security\nTransaction\nTax(Rs.)",
+            "Other\nStatutory\n*Levies(Rs.)",
+            "Net Amount\n(Rs.)"
+        ],
+        [
+            "Derivative",
+            security_description,
+            str(buy_quantity),
+            "0",  # Quantity Sold is 0 for derivatives in this context
+            str(abs(net_total)),
+            str(wap_rs),
+            str(abs(buy_quantity * brokerage_per_unit)),
+            "0.00",
+            "0.00",
+            "0.00",
+            str(abs(net_total)),
+        ]
+    ]
+
+    transformed_data.append(segment_data)
+    return transformed_data
